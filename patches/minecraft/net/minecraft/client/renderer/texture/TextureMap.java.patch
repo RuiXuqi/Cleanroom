@@ -21,11 +21,17 @@
      public void loadSprites(IResourceManager resourceManager, ITextureMapPopulator iconCreatorIn)
      {
          this.mapRegisteredSprites.clear();
-+        net.minecraftforge.client.ForgeHooksClient.onTextureStitchedPre(this);
++        this.onTextureStitchedPre();
          iconCreatorIn.registerSprites(this);
          this.initMissingImage();
          this.deleteGlTexture();
-@@ -84,29 +95,74 @@
+@@ -79,34 +90,78 @@
+     public void loadTextureAtlas(IResourceManager resourceManager)
+     {
+         int i = Minecraft.getGLMaximumTextureSize();
+-        Stitcher stitcher = new Stitcher(i, i, 0, this.mipmapLevels);
++        Stitcher stitcher = new Stitcher(i, i, this.mipmapLevels);
+         this.mapUploadedSprites.clear();
          this.listAnimatedSprites.clear();
          int j = Integer.MAX_VALUE;
          int k = 1 << this.mipmapLevels;
@@ -91,10 +97,11 @@
              {
                  PngSizeInfo pngsizeinfo = PngSizeInfo.makeFromResource(resourceManager.getResource(resourcelocation));
                  iresource = resourceManager.getResource(resourcelocation);
-                 boolean flag = iresource.getMetadata("animation") != null;
-                 textureatlassprite.loadSprite(pngsizeinfo, flag);
-             }
+-                boolean flag = iresource.getMetadata("animation") != null;
+-                textureatlassprite.loadSprite(pngsizeinfo, flag);
++                textureatlassprite.loadSprite(pngsizeinfo, iresource.getMetadata("animation"));
 +            }
+             }
              catch (RuntimeException runtimeexception)
              {
 -                LOGGER.error("Unable to parse metadata from {}", resourcelocation, runtimeexception);
@@ -111,7 +118,7 @@
              }
              finally
              {
-@@ -118,23 +174,36 @@
+@@ -118,34 +173,40 @@
  
              if (j1 < k)
              {
@@ -131,27 +138,25 @@
  
 +            if (generateMipmaps(resourceManager, textureatlassprite))
              stitcher.addSprite(textureatlassprite);
--        }
 +            return j;
-+        }
+         }
+-
+-        int l = Math.min(j, k);
+-        int i1 = MathHelper.log2(l);
+-
+-        if (i1 < this.mipmapLevels)
 +        finally
-+        {
+         {
+-            LOGGER.warn("{}: dropping miplevel from {} to {}, because of minimum power of two: {}", this.basePath, this.mipmapLevels, i1, l);
+-            this.mipmapLevels = i1;
 +            loadingSprites.removeLast();
 +            loadedSprites.add(location);
-+        }
+         }
 +    }
- 
++
 +    private void finishLoading(Stitcher stitcher, net.minecraftforge.fml.common.ProgressManager.ProgressBar bar, int j, int k)
 +    {
 +        net.minecraftforge.fml.common.ProgressManager.pop(bar);
-         int l = Math.min(j, k);
-         int i1 = MathHelper.log2(l);
- 
-+        if (false) // FORGE: do not lower the mipmap level
-         if (i1 < this.mipmapLevels)
-         {
-             LOGGER.warn("{}: dropping miplevel from {} to {}, because of minimum power of two: {}", this.basePath, this.mipmapLevels, i1, l);
-@@ -143,9 +212,11 @@
  
          this.missingImage.generateMipmaps(this.mipmapLevels);
          stitcher.addSprite(this.missingImage);
@@ -163,7 +168,7 @@
              stitcher.doStitch();
          }
          catch (StitcherException stitcherexception)
-@@ -154,12 +225,16 @@
+@@ -154,12 +215,16 @@
          }
  
          LOGGER.info("Created: {}x{} {}-atlas", stitcher.getCurrentWidth(), stitcher.getCurrentHeight(), this.basePath);
@@ -181,16 +186,16 @@
              {
                  String s = textureatlassprite1.getIconName();
                  map.remove(s);
-@@ -197,6 +272,8 @@
+@@ -197,6 +262,8 @@
          {
              textureatlassprite2.copyFrom(this.missingImage);
          }
-+        net.minecraftforge.client.ForgeHooksClient.onTextureStitchedPost(this);
++        this.onTextureStitchedPost();
 +        net.minecraftforge.fml.common.ProgressManager.pop(bar);
      }
  
      private boolean generateMipmaps(IResourceManager resourceManager, final TextureAtlasSprite texture)
-@@ -206,7 +283,7 @@
+@@ -206,7 +273,7 @@
          label45:
          {
              boolean lvt_6_1_;
@@ -199,7 +204,7 @@
              try
              {
                  iresource = resourceManager.getResource(resourcelocation);
-@@ -302,7 +379,7 @@
+@@ -302,7 +369,7 @@
          }
          else
          {
@@ -208,7 +213,7 @@
  
              if (textureatlassprite == null)
              {
-@@ -328,5 +405,53 @@
+@@ -328,5 +395,66 @@
      public TextureAtlasSprite getMissingSprite()
      {
          return this.missingImage;
@@ -260,5 +265,18 @@
 +    public int getMipmapLevels()
 +    {
 +        return mipmapLevels;
++    }
++
++    // Stub the two methods if you are creating a customized map
++    // The two events are designed for Minecraft.textureMapBlocks
++
++    protected void onTextureStitchedPre()
++    {
++        net.minecraftforge.client.ForgeHooksClient.onTextureStitchedPre(this);
++    }
++
++    protected void onTextureStitchedPost()
++    {
++        net.minecraftforge.client.ForgeHooksClient.onTextureStitchedPost(this);
      }
  }

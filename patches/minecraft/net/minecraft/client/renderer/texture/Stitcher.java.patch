@@ -1,9 +1,55 @@
 --- before/net/minecraft/client/renderer/texture/Stitcher.java
 +++ after/net/minecraft/client/renderer/texture/Stitcher.java
-@@ -56,9 +56,11 @@
+@@ -13,6 +13,10 @@
+ @SideOnly(Side.CLIENT)
+ public class Stitcher
+ {
++    public static final java.util.Comparator<Holder> HOLDER_COMPARATOR = java.util.Comparator
++            .<Holder>comparingInt(holder -> -holder.getHeight())
++            .thenComparingInt(holder -> -holder.getWidth())
++            .thenComparing(holder -> new net.minecraft.util.ResourceLocation(holder.getAtlasSprite().getIconName()));
+     private final int mipmapLevelStitcher;
+     private final Set<Stitcher.Holder> setStitchHolders = Sets.newHashSetWithExpectedSize(256);
+     private final List<Stitcher.Slot> stitchSlots = Lists.newArrayListWithCapacity(256);
+@@ -20,14 +24,18 @@
+     private int currentHeight;
+     private final int maxWidth;
+     private final int maxHeight;
+-    private final int maxTileDimension;
+ 
++    @Deprecated
+     public Stitcher(int maxWidthIn, int maxHeightIn, int maxTileDimensionIn, int mipmapLevelStitcherIn)
+     {
++        this(maxWidthIn, maxHeightIn, mipmapLevelStitcherIn);
++    }
++
++    public Stitcher(int maxWidthIn, int maxHeightIn, int mipmapLevelStitcherIn)
++    {
+         this.mipmapLevelStitcher = mipmapLevelStitcherIn;
+         this.maxWidth = maxWidthIn;
+         this.maxHeight = maxHeightIn;
+-        this.maxTileDimension = maxTileDimensionIn;
+     }
+ 
+     public int getCurrentWidth()
+@@ -43,22 +51,18 @@
+     public void addSprite(TextureAtlasSprite textureAtlas)
+     {
+         Stitcher.Holder stitcher$holder = new Stitcher.Holder(textureAtlas, this.mipmapLevelStitcher);
+-
+-        if (this.maxTileDimension > 0)
+-        {
+-            stitcher$holder.setNewDimension(this.maxTileDimension);
+-        }
+-
+         this.setStitchHolders.add(stitcher$holder);
+     }
+ 
+     public void doStitch()
      {
          Stitcher.Holder[] astitcher$holder = this.setStitchHolders.toArray(new Stitcher.Holder[this.setStitchHolders.size()]);
-         Arrays.sort((Object[])astitcher$holder);
+-        Arrays.sort((Object[])astitcher$holder);
++        Arrays.sort(astitcher$holder, HOLDER_COMPARATOR);
 +        net.minecraftforge.fml.common.ProgressManager.ProgressBar bar = net.minecraftforge.fml.common.ProgressManager.push("Texture stitching", astitcher$holder.length);
  
          for (Stitcher.Holder stitcher$holder : astitcher$holder)
@@ -12,7 +58,7 @@
              if (!this.allocateSlot(stitcher$holder))
              {
                  String s = String.format(
-@@ -67,12 +69,16 @@
+@@ -67,12 +71,16 @@
                                 stitcher$holder.getAtlasSprite().getIconWidth(),
                                 stitcher$holder.getAtlasSprite().getIconHeight()
                             );
@@ -29,7 +75,59 @@
      }
  
      public List<TextureAtlasSprite> getStichSlots()
-@@ -155,7 +161,7 @@
+@@ -91,7 +99,7 @@
+             Stitcher.Holder stitcher$holder = stitcher$slot1.getStitchHolder();
+             TextureAtlasSprite textureatlassprite = stitcher$holder.getAtlasSprite();
+             textureatlassprite.initSprite(
+-                this.currentWidth, this.currentHeight, stitcher$slot1.getOriginX(), stitcher$slot1.getOriginY(), stitcher$holder.isRotated()
++                this.currentWidth, this.currentHeight, stitcher$slot1.getOriginX(), stitcher$slot1.getOriginY()
+             );
+             list1.add(textureatlassprite);
+         }
+@@ -106,27 +114,12 @@
+ 
+     private boolean allocateSlot(Stitcher.Holder p_94310_1_)
+     {
+-        TextureAtlasSprite textureatlassprite = p_94310_1_.getAtlasSprite();
+-        boolean flag = textureatlassprite.getIconWidth() != textureatlassprite.getIconHeight();
+-
+         for (int i = 0; i < this.stitchSlots.size(); i++)
+         {
+             if (this.stitchSlots.get(i).addSlot(p_94310_1_))
+             {
+                 return true;
+             }
+-
+-            if (flag)
+-            {
+-                p_94310_1_.rotate();
+-
+-                if (this.stitchSlots.get(i).addSlot(p_94310_1_))
+-                {
+-                    return true;
+-                }
+-
+-                p_94310_1_.rotate();
+-            }
+         }
+ 
+         return this.expandAndAllocateSlot(p_94310_1_);
+@@ -134,12 +127,10 @@
+ 
+     private boolean expandAndAllocateSlot(Stitcher.Holder p_94311_1_)
+     {
+-        int i = Math.min(p_94311_1_.getWidth(), p_94311_1_.getHeight());
+-        int j = Math.max(p_94311_1_.getWidth(), p_94311_1_.getHeight());
+         int k = MathHelper.smallestEncompassingPowerOfTwo(this.currentWidth);
+         int l = MathHelper.smallestEncompassingPowerOfTwo(this.currentHeight);
+-        int i1 = MathHelper.smallestEncompassingPowerOfTwo(this.currentWidth + i);
+-        int j1 = MathHelper.smallestEncompassingPowerOfTwo(this.currentHeight + i);
++        int i1 = MathHelper.smallestEncompassingPowerOfTwo(this.currentWidth + p_94311_1_.getWidth());
++        int j1 = MathHelper.smallestEncompassingPowerOfTwo(this.currentHeight + p_94311_1_.getHeight());
+         boolean flag1 = i1 <= this.maxWidth;
+         boolean flag2 = j1 <= this.maxHeight;
+ 
+@@ -155,7 +146,7 @@
  
              if (flag3 ^ flag4)
              {
@@ -38,7 +136,86 @@
              }
              else
              {
-@@ -248,7 +254,7 @@
+@@ -166,23 +157,18 @@
+ 
+             if (flag)
+             {
+-                if (p_94311_1_.getWidth() > p_94311_1_.getHeight())
+-                {
+-                    p_94311_1_.rotate();
+-                }
+-
+                 if (this.currentHeight == 0)
+                 {
+                     this.currentHeight = p_94311_1_.getHeight();
+                 }
+ 
+                 stitcher$slot = new Stitcher.Slot(this.currentWidth, 0, p_94311_1_.getWidth(), this.currentHeight);
+-                this.currentWidth = this.currentWidth + p_94311_1_.getWidth();
++                this.currentWidth = i1;
+             }
+             else
+             {
+                 stitcher$slot = new Stitcher.Slot(0, this.currentHeight, this.currentWidth, p_94311_1_.getHeight());
+-                this.currentHeight = this.currentHeight + p_94311_1_.getHeight();
++                this.currentHeight = j1;
+             }
+ 
+             stitcher$slot.addSlot(p_94311_1_);
+@@ -198,7 +184,6 @@
+             private final int width;
+             private final int height;
+             private final int mipmapLevelHolder;
+-            private boolean rotated;
+             private float scaleFactor = 1.0F;
+ 
+             public Holder(TextureAtlasSprite theTextureIn, int mipmapLevelHolderIn)
+@@ -207,7 +192,6 @@
+                 this.width = theTextureIn.getIconWidth();
+                 this.height = theTextureIn.getIconHeight();
+                 this.mipmapLevelHolder = mipmapLevelHolderIn;
+-                this.rotated = Stitcher.getMipmapDimension(this.height, mipmapLevelHolderIn) > Stitcher.getMipmapDimension(this.width, mipmapLevelHolderIn);
+             }
+ 
+             public TextureAtlasSprite getAtlasSprite()
+@@ -217,38 +201,36 @@
+ 
+             public int getWidth()
+             {
+-                int i = this.rotated ? this.height : this.width;
++                int i = this.width;
+                 return Stitcher.getMipmapDimension((int)(i * this.scaleFactor), this.mipmapLevelHolder);
+             }
+ 
+             public int getHeight()
+             {
+-                int i = this.rotated ? this.width : this.height;
++                int i = this.height;
+                 return Stitcher.getMipmapDimension((int)(i * this.scaleFactor), this.mipmapLevelHolder);
+             }
+ 
++            @Deprecated
+             public void rotate()
+             {
+-                this.rotated = !this.rotated;
+             }
+ 
++            @Deprecated
+             public boolean isRotated()
+             {
+-                return this.rotated;
++                return false;
+             }
+ 
++            @Deprecated
+             public void setNewDimension(int p_94196_1_)
+             {
+-                if (this.width > p_94196_1_ && this.height > p_94196_1_)
+-                {
+-                    this.scaleFactor = (float)p_94196_1_ / Math.min(this.width, this.height);
+-                }
+             }
+ 
              @Override
              public String toString()
              {

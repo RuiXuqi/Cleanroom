@@ -1,9 +1,28 @@
 --- before/net/minecraft/client/renderer/texture/TextureAtlasSprite.java
 +++ after/net/minecraft/client/renderer/texture/TextureAtlasSprite.java
-@@ -49,12 +49,10 @@
+@@ -22,7 +22,6 @@
+     protected List<int[][]> framesTextureData = Lists.newArrayList();
+     protected int[][] interpolatedFrameData;
+     private AnimationMetadataSection animationMetadata;
+-    protected boolean rotated;
+     protected int originX;
+     protected int originY;
+     protected int width;
+@@ -44,17 +43,20 @@
+         return new TextureAtlasSprite(spriteResourceLocation.toString());
+     }
+ 
++    @Deprecated
+     public void initSprite(int inX, int inY, int originInX, int originInY, boolean rotatedIn)
+     {
++        this.initSprite(inX, inY, originInX, originInY);
++    }
++
++    public void initSprite(int inX, int inY, int originInX, int originInY)
++    {
          this.originX = originInX;
          this.originY = originInY;
-         this.rotated = rotatedIn;
+-        this.rotated = rotatedIn;
 -        float f = (float)(0.01F / inX);
 -        float f1 = (float)(0.01F / inY);
 -        this.minU = originInX / (float)inX + f;
@@ -17,7 +36,131 @@
      }
  
      public void copyFrom(TextureAtlasSprite atlasSpirit)
-@@ -421,4 +419,39 @@
+@@ -63,7 +65,6 @@
+         this.originY = atlasSpirit.originY;
+         this.width = atlasSpirit.width;
+         this.height = atlasSpirit.height;
+-        this.rotated = atlasSpirit.rotated;
+         this.minU = atlasSpirit.minU;
+         this.maxU = atlasSpirit.maxU;
+         this.minV = atlasSpirit.minV;
+@@ -231,19 +232,26 @@
+         this.height = newHeight;
+     }
+ 
++    @Deprecated
+     public void loadSprite(PngSizeInfo sizeInfo, boolean p_188538_2_) throws IOException
+     {
++        this.loadSprite(sizeInfo, p_188538_2_ ? new AnimationMetadataSection(Lists.newArrayList(), -1, -1, 1, false) : null);
++    }
++
++    public void loadSprite(PngSizeInfo sizeInfo, @javax.annotation.Nullable AnimationMetadataSection animationMetadata) throws IOException
++    {
+         this.resetSprite();
+         this.width = sizeInfo.pngWidth;
+         this.height = sizeInfo.pngHeight;
+ 
+-        if (p_188538_2_)
+-        {
+-            this.height = this.width;
+-        }
+-        else if (sizeInfo.pngHeight != sizeInfo.pngWidth)
+-        {
+-            throw new RuntimeException("broken aspect ratio and not an animation");
++        if (animationMetadata != null)
++        {
++            int frameWidth = animationMetadata.getFrameWidth();
++            int frameHeight = animationMetadata.getFrameHeight();
++            int defaultFrameSize = Math.min(sizeInfo.pngWidth, sizeInfo.pngHeight);
++            this.width = frameWidth != -1 ? frameWidth : frameHeight != -1 ? sizeInfo.pngWidth : defaultFrameSize;
++            this.height = frameHeight != -1 ? frameHeight : frameWidth != -1 ? sizeInfo.pngHeight : defaultFrameSize;
++            if (sizeInfo.pngWidth % this.width != 0 || sizeInfo.pngHeight % this.height != 0) throw new RuntimeException("broken frame size");
+         }
+     }
+ 
+@@ -261,7 +269,9 @@
+         }
+         else
+         {
+-            int i = bufferedimage.getHeight() / this.width;
++            int frameColumns = bufferedimage.getWidth() / this.width;
++            int frameRows = bufferedimage.getHeight() / this.height;
++            int i = frameColumns * frameRows;
+ 
+             if (animationmetadatasection.getFrameCount() > 0)
+             {
+@@ -273,7 +283,7 @@
+                     }
+ 
+                     this.allocateFrameTextureData(j);
+-                    this.framesTextureData.set(j, getFrameTextureData(aint, this.width, this.width, j));
++                    this.framesTextureData.set(j, getFrameTextureData(aint, this.width, this.height, j, frameColumns));
+                 }
+ 
+                 this.animationMetadata = animationmetadatasection;
+@@ -284,7 +294,7 @@
+ 
+                 for (int k = 0; k < i; k++)
+                 {
+-                    this.framesTextureData.add(getFrameTextureData(aint, this.width, this.width, k));
++                    this.framesTextureData.add(getFrameTextureData(aint, this.width, this.height, k, frameColumns));
+                     list.add(new AnimationFrame(k, -1));
+                 }
+ 
+@@ -307,7 +317,7 @@
+             {
+                 try
+                 {
+-                    list.add(TextureUtil.generateMipmapData(level, this.width, aint));
++                    list.add(TextureUtil.generateMipmapData(level, this.width, this.height, aint));
+                 }
+                 catch (Throwable throwable)
+                 {
+@@ -352,8 +362,14 @@
+         }
+     }
+ 
++    @Deprecated
+     private static int[][] getFrameTextureData(int[][] data, int rows, int columns, int p_147962_3_)
+     {
++        return getFrameTextureData(data, rows, columns, p_147962_3_, 1);
++    }
++
++    private static int[][] getFrameTextureData(int[][] data, int rows, int columns, int frameIndex, int frameColumns)
++    {
+         int[][] aint = new int[data.length][];
+ 
+         for (int i = 0; i < data.length; i++)
+@@ -362,8 +378,17 @@
+ 
+             if (aint1 != null)
+             {
+-                aint[i] = new int[(rows >> i) * (columns >> i)];
+-                System.arraycopy(aint1, p_147962_3_ * aint[i].length, aint[i], 0, aint[i].length);
++                int frameWidth = rows >> i;
++                int frameHeight = columns >> i;
++                int imageWidth = frameColumns * frameWidth;
++                int frameX = frameIndex % frameColumns * frameWidth;
++                int frameY = frameIndex / frameColumns * frameHeight;
++                aint[i] = new int[frameWidth * frameHeight];
++
++                for (int j = 0; j < frameHeight; j++)
++                {
++                    System.arraycopy(aint1, frameX + (frameY + j) * imageWidth, aint[i], j * frameWidth, frameWidth);
++                }
+             }
+         }
+ 
+@@ -401,8 +426,6 @@
+                + '\''
+                + ", frameCount="
+                + this.framesTextureData.size()
+-               + ", rotated="
+-               + this.rotated
+                + ", x="
+                + this.originX
+                + ", y="
+@@ -421,4 +444,39 @@
                 + this.maxV
                 + '}';
      }
