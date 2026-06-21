@@ -180,11 +180,11 @@
 +
 +    /**
 +     * Load the specified resource as this sprite's data.
-+     * Returning false from this function will prevent this icon from being stitched onto the master texture.
++     * Returning true from this function will prevent this icon from being stitched onto the master texture.
 +     * @param manager Main resource manager
 +     * @param location File resource location
 +     * @param textureGetter accessor for dependencies. All of them will be loaded before this one
-+     * @return False to prevent this Icon from being stitched
++     * @return True to prevent this Icon from being stitched
 +     */
 +    public boolean load(net.minecraft.client.resources.IResourceManager manager, net.minecraft.util.ResourceLocation location, java.util.function.Function<ResourceLocation, TextureAtlasSprite> textureGetter)
 +    {
